@@ -2,3 +2,6 @@ numpy
 pandas
 igraph
 scipy
+networkx
+matplotlib
+plotly
