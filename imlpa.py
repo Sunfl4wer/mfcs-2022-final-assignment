@@ -3,6 +3,8 @@ from faker import Faker
 import heapq
 import pandas as pd
 import scipy
+import networkx as nx
+import matplotlib.pyplot as plt
 
 fake = Faker()
 
@@ -177,6 +179,14 @@ def extractCommnunity(propagatedLabels):
             community[l].append(node)
     return community
 
+def networkXGraph(ug):
+    G=nx.Graph()
+    for start in ug:
+        ends = ug[start]
+        for end in ends:
+            G.add_edge(start, end)
+    return G
+
 ug = readDataSet()
 propagatedLabels, nodeCentralities, nodeLabels = imlpa(ug)
 celebs = getNMostInfluenceNode(nodeCentralities, nodeLabels, 3)
@@ -184,3 +194,16 @@ print(celebs)
 
 communities = extractCommnunity(propagatedLabels)
 print("communities", communities)
+
+nxG = networkXGraph(ug)
+spring_pos = nx.spring_layout(nxG, seed=2) 
+
+colors = "bgrcmykw"
+color_index = 0
+for label in communities:
+    community = communities[label]
+    nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colors[color_index], alpha=0.4)
+    color_index += 1
+
+nx.draw_networkx_edges(nxG, spring_pos,style='dashed',width = 0.5)
+plt.show()
