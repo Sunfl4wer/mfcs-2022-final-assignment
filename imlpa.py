@@ -5,6 +5,7 @@ import pandas as pd
 import scipy
 import networkx as nx
 import matplotlib.pyplot as plt
+import random
 
 fake = Faker()
 
@@ -57,11 +58,20 @@ def findKeysWithMax(d):
             maxKeys.append(k)
     return maxKeys
 
+# Unify distribution of p
+def shouldPropagate(p):
+    arr = [0]*round(1/p)
+    arr[0] = 1
+    return random.choice(arr) == 1
+
 # Extended Kronecker delta
 def extendedKroneckerDelta(ug, node, nodeLabels):
     Nv = ug[node]
     labelRank = {}
+    inactiveNode = len(nodeLabels[node]) == 0
     for n in Nv:
+        if inactiveNode and not shouldPropagate(0.025):
+            continue
         nLabels = nodeLabels[n]
         for l in nLabels:
             if l not in labelRank:
@@ -196,13 +206,13 @@ communities = extractCommnunity(propagatedLabels)
 print("communities", communities)
 
 nxG = networkXGraph(ug)
-spring_pos = nx.spring_layout(nxG, seed=2) 
+spring_pos = nx.spring_layout(nxG, seed=10) 
 
 colors = "bgrcmykw"
 color_index = 0
 for label in communities:
     community = communities[label]
-    nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colors[color_index], alpha=0.4)
+    nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colors[color_index%len(colors)], alpha=0.4)
     color_index += 1
 
 nx.draw_networkx_edges(nxG, spring_pos,style='dashed',width = 0.5)
