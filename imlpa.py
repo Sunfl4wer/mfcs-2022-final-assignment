@@ -32,6 +32,7 @@ def findSeedNodes(ug):
     copiedUG = copy.deepcopy(ug)
     candidates, deg = metadata(copiedUG)
     seedNodes = []
+    print("deg", deg)
     while len(candidates) != 0:
         highestDegreeNode = max(deg, key=deg.get)
         seedNodes.append(highestDegreeNode)
@@ -52,6 +53,7 @@ def findKeysWithMax(d):
     vs = [d[k] for k in d]
     ks = [k for k in d]
     keys = []
+    # V = max(vs)
     for key in d:
         vals = d[key]
         for i in range(vals):
@@ -59,8 +61,8 @@ def findKeysWithMax(d):
     maxKeys = []
     maxKeys.extend(random.choices(keys, k=1))
     # for k in ks:
-        # if d[k] == V:
-        #     maxKeys.append(k)
+    #     if d[k] == V:
+    #         maxKeys.append(k)
     return maxKeys
 
 # Unify distribution of p
@@ -77,7 +79,7 @@ def extendedKroneckerDelta(ug, node, nodeLabels):
         neighborLabels = nodeLabels[neighbor]
         if len(nodeLabels[neighbor]) == 0:
             continue
-        if len(nodeLabels[node]) == 0 and not shouldPropagate(0.5):
+        if len(nodeLabels[node]) == 0 and not shouldPropagate(0.25):
             continue
         for label in neighborLabels:
             if label not in labelRank:
@@ -113,6 +115,51 @@ def isInactive(node, nodeLabels):
         return True
     return False
 
+def isSoftCommunity(ug, community):
+    totalIn = 0
+    totalOut= 0
+    for node in community:
+        neighbors = ug[node]
+        inCommunityNeighbors = [n for n in neighbors if n in community]
+        noCommunityNeighbors = len(inCommunityNeighbors)
+        noNotCommunityNeighbors = len(neighbors) - len(inCommunityNeighbors)
+        totalIn += noCommunityNeighbors
+        totalOut += noNotCommunityNeighbors
+    if totalOut == 0:
+        return True
+    return totalIn >= totalOut
+
+def isSoftCommunities(ug, communities):
+    for label in communities:
+        community = communities[label]
+        isSoft = isSoftCommunity(ug, community)
+        if not isSoft:
+            return False
+    return True
+
+def isStrictCommunity(ug, community):
+    for node in community:
+        neighbors = ug[node]
+        inCommunityNeighbors = [n for n in neighbors if n in community]
+        noCommunityNeighbors = len(inCommunityNeighbors)
+        noNotCommunityNeighbors = len(neighbors) - len(inCommunityNeighbors)
+        if noCommunityNeighbors < noNotCommunityNeighbors:
+            return False
+    return True
+
+def isStrictCommunities(ug, communities):
+    for label in communities:
+        community = communities[label]
+        isStrict = isStrictCommunity(ug, community)
+        if not isStrict:
+            return False
+    return True
+
+def isCommunities(ug, communities, isStrict):
+    if isStrict:
+        return isStrictCommunities(ug, communities)
+    return isSoftCommunities(ug, communities)
+
 def labelPropagation(ug, nodeLabels, colorMap):
     beforePropagation = {}
     afterPropagation = copy.deepcopy(nodeLabels)
@@ -123,7 +170,8 @@ def labelPropagation(ug, nodeLabels, colorMap):
     colors = "bgrcmykw"
 
     count = 0
-    while beforePropagation != afterPropagation:
+    sastisfyCommunities = False
+    while not sastisfyCommunities:#beforePropagation != afterPropagation:
         count+=1
         beforePropagation = copy.deepcopy(afterPropagation)
         for node in ug:
@@ -140,6 +188,7 @@ def labelPropagation(ug, nodeLabels, colorMap):
         plt.title('Iteration {}'.format(count))
         color_index = 0
         communities = extractCommnunity(afterPropagation)
+        sastisfyCommunities = isCommunities(ug, communities, False)
 
         for label in communities:
             community = communities[label]
@@ -151,7 +200,7 @@ def labelPropagation(ug, nodeLabels, colorMap):
         nx.draw_networkx_edges(nxG, spring_pos, style='dashed', width = 0.5)
 
         # Put a legend to the right of the current axis
-        plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
+        plt.legend(loc='center left', bbox_to_anchor=(0.90, 0.5))
         plt.pause(0.00000001)
         plt.draw()
             
@@ -182,6 +231,11 @@ def matrixFormToArrayForm(ndarr):
 def readDataSet():
     social_dataset = scipy.io.mmread('socfb-Caltech36.mtx')
     social_dataset_df = pd.DataFrame.sparse.from_spmatrix(social_dataset)
+
+    # generatedGraph = nx.random_partition_graph([50,50,50,50,50], 0.25, 0.25, seed=None, directed=False)
+    # generatedAdjacentGraph = nx.adjacency_matrix(generatedGraph)
+    # return matrixFormToArrayForm(generatedAdjacentGraph.toarray())
+
     return matrixFormToArrayForm(social_dataset_df.to_numpy())
 
 def imlpa(ug):
