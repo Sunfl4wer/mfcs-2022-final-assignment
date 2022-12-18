@@ -56,6 +56,7 @@ def findKeysWithMax(d):
     for k in ks:
         if d[k] == V:
             maxKeys.append(k)
+        # maxKeys.append(random.choice(ks))
     return maxKeys
 
 # Unify distribution of p
@@ -64,25 +65,34 @@ def shouldPropagate(p):
     arr[0] = 1
     return random.choice(arr) == 1
 
-# Extended Kronecker delta
+# Extended Kronecker delta independant cascade
 def extendedKroneckerDelta(ug, node, nodeLabels):
-    Nv = ug[node]
+    neighbors = ug[node]
     labelRank = {}
-    inactiveNode = len(nodeLabels[node]) == 0
-    for n in Nv:
-        if inactiveNode and not shouldPropagate(0.025):
+    for neighbor in neighbors:
+        neighborLabels = nodeLabels[neighbor]
+        if len(nodeLabels[neighbor]) == 0:
             continue
-        nLabels = nodeLabels[n]
-        for l in nLabels:
-            if l not in labelRank:
-                labelRank[l] = 0
-            labelRank[l] = labelRank[l] + 1
+        if len(nodeLabels[node]) == 0 and not shouldPropagate(0.025):
+            continue
+        for label in neighborLabels:
+            if label not in labelRank:
+                labelRank[label] = 0
+            labelRank[label] = labelRank[label] + 1
  
     if len(labelRank) == 0:
         return nodeLabels
 
-    nodeLabels[node] = findKeysWithMax(labelRank)
+    maxKeys = findKeysWithMax(labelRank)
+    nodeLabels[node] = maxKeys
     return nodeLabels
+
+def generateColorMap(nodes, nodeLabels):
+    colorMap = {}
+    for node in nodes:
+        colorMap[nodeLabels[node][0]] = "#%06x" % random.randint(0, 0xFFFFFF)
+    colorMap["none"] = "#%06x" % random.randint(0, 0xFFFFFF)
+    return colorMap
     
 def findLabelOccupations(nodeLabels):
     labelOccupation = {}
@@ -94,22 +104,51 @@ def findLabelOccupations(nodeLabels):
             labelOccupation[l] = labelOccupation[l]+1
     return labelOccupation
 
+def isInactive(node, nodeLabels):
+    if node not in nodeLabels or len(nodeLabels[node]) == 0:
+        return True
+    return False
 
-def labelPropagation(ug, labels):
+def labelPropagation(ug, nodeLabels, colorMap):
     beforePropagation = {}
-    afterPropagation = copy.deepcopy(labels)
+    afterPropagation = copy.deepcopy(nodeLabels)
     Nvt = {}
-    while beforePropagation != afterPropagation:
-        beforePropagation = copy.deepcopy(afterPropagation)
-        for n in ug:
-            afterPropagation = extendedKroneckerDelta(ug, n, afterPropagation)
 
+    nxG = networkXGraph(ug)
+    spring_pos = nx.spring_layout(nxG, seed=2) 
+    colors = "bgrcmykw"
+
+    count = 0
+    while beforePropagation != afterPropagation:
+        count+=1
+        beforePropagation = copy.deepcopy(afterPropagation)
+        for node in ug:
+            afterPropagation = extendedKroneckerDelta(ug, node, afterPropagation)
             # For each t update Nv
             labelOccupations = findLabelOccupations(afterPropagation)
             for l in labelOccupations:
                 if l not in Nvt:
                     Nvt[l] = []
                 Nvt[l].append(labelOccupations[l])
+        
+        # Drawing label propagation process
+        plt.clf()
+        plt.title('Iteration {}'.format(count))
+        color_index = 0
+        communities = extractCommnunity(afterPropagation)
+
+        for label in communities:
+            community = communities[label]
+            nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colorMap[label], alpha=0.4, label=label)
+            color_index += 1
+
+        nx.draw_networkx_edges(nxG, spring_pos, style='dashed', width = 0.5)
+
+        # Put a legend to the right of the current axis
+        plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
+        plt.pause(1)
+        plt.draw()
+            
     return afterPropagation, Nvt
 
 def findLabelCentrality(Nvt):
@@ -142,11 +181,14 @@ def readDataSet():
 def imlpa(ug):
     # Find seed nodes
     seedNodes = findSeedNodes(ug)
-    # print("seed nodes", seedNodes)
+    print("seed nodes", seedNodes)
 
     # Assign label to seed nodes
     seedNodeLabels = assignLabel(seedNodes)
     # print("seed node labels", seedNodeLabels)
+    print("Number of seed nodes", len(seedNodeLabels))
+
+    colorMap = generateColorMap(seedNodes, seedNodeLabels)
 
     # Non-seed nodes should be assigned with empty label set
     nodeLabels = copy.deepcopy(seedNodeLabels)
@@ -156,8 +198,8 @@ def imlpa(ug):
             nodeLabels[n] = []
 
     # Start propagating labels until labels distribution is stable
-    propagatedLabels, Nvt = labelPropagation(ug, nodeLabels)
-    print(propagatedLabels)
+    propagatedLabels, Nvt = labelPropagation(ug, nodeLabels, colorMap)
+    # print(propagatedLabels)
 
     # Find labels centrality to know which node has the most influence
     labelCetrality = findLabelCentrality(Nvt)
@@ -200,20 +242,11 @@ def networkXGraph(ug):
 ug = readDataSet()
 propagatedLabels, nodeCentralities, nodeLabels = imlpa(ug)
 celebs = getNMostInfluenceNode(nodeCentralities, nodeLabels, 3)
-print(celebs)
+# print(celebs)
+print("Number of celebrities", len(celebs))
 
 communities = extractCommnunity(propagatedLabels)
 print("communities", communities)
+print("Number of communities", len(communities))
 
-nxG = networkXGraph(ug)
-spring_pos = nx.spring_layout(nxG, seed=10) 
-
-colors = "bgrcmykw"
-color_index = 0
-for label in communities:
-    community = communities[label]
-    nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colors[color_index%len(colors)], alpha=0.4)
-    color_index += 1
-
-nx.draw_networkx_edges(nxG, spring_pos,style='dashed',width = 0.5)
 plt.show()
