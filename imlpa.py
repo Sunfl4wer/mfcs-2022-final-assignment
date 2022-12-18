@@ -51,12 +51,16 @@ def findSeedNodes(ug):
 def findKeysWithMax(d):
     vs = [d[k] for k in d]
     ks = [k for k in d]
-    V = max(vs)
+    keys = []
+    for key in d:
+        vals = d[key]
+        for i in range(vals):
+            keys.append(key)
     maxKeys = []
-    for k in ks:
-        if d[k] == V:
-            maxKeys.append(k)
-        # maxKeys.append(random.choice(ks))
+    maxKeys.extend(random.choices(keys, k=1))
+    # for k in ks:
+        # if d[k] == V:
+        #     maxKeys.append(k)
     return maxKeys
 
 # Unify distribution of p
@@ -73,7 +77,7 @@ def extendedKroneckerDelta(ug, node, nodeLabels):
         neighborLabels = nodeLabels[neighbor]
         if len(nodeLabels[neighbor]) == 0:
             continue
-        if len(nodeLabels[node]) == 0 and not shouldPropagate(0.025):
+        if len(nodeLabels[node]) == 0 and not shouldPropagate(0.5):
             continue
         for label in neighborLabels:
             if label not in labelRank:
@@ -139,14 +143,16 @@ def labelPropagation(ug, nodeLabels, colorMap):
 
         for label in communities:
             community = communities[label]
-            nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colorMap[label], alpha=0.4, label=label)
+            noMember = len(community)
+            displayLabel = "%s - %d" % (label, noMember)
+            nx.draw_networkx_nodes(nxG, spring_pos, nodelist=community, node_color=colorMap[label], alpha=0.4, label=displayLabel)
             color_index += 1
 
         nx.draw_networkx_edges(nxG, spring_pos, style='dashed', width = 0.5)
 
         # Put a legend to the right of the current axis
         plt.legend(loc='center left', bbox_to_anchor=(0.95, 0.5))
-        plt.pause(1)
+        plt.pause(0.00000001)
         plt.draw()
             
     return afterPropagation, Nvt
